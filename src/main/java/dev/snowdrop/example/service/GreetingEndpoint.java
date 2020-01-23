@@ -115,7 +115,7 @@ public class GreetingEndpoint {
     			}
     		}
             //TODO execute group chat creation 
-    		client.send(new TdApi.GetMe(), defaultHandler);
+    		//client.send(new TdApi.GetMe(), defaultHandler);
             //and logout
     	} else {
     		System.out.println("Invalid phoneNumber " + phoneNumber);
@@ -162,7 +162,7 @@ public class GreetingEndpoint {
         synchronized (variableLock) {     
         	while (variable == null) {   		
         		try {
-        			System.out.println("wait " + variable);
+        			System.out.println("wait " + GreetingEndpoint.phoneNumber + ":" + GreetingEndpoint.code);
         			variableLock.wait();
         		} catch (Exception e) {
         			e.printStackTrace();
