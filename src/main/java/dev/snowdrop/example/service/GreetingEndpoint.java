@@ -75,7 +75,7 @@ public class GreetingEndpoint {
     	if (!phoneNumber.equals("unknown")) {
     		AuthorizationRequestHandler authorizationRequestHandler = new AuthorizationRequestHandler(phoneNumber);
     		authHandlers.put(phoneNumber, authorizationRequestHandler);
-    		client.setUpdatesHandler(new UpdatesHandler(phoneNumber));
+    		client.setUpdatesHandler(new UpdatesHandler(phoneNumber), new ExceptionHandler());
     	}
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber);
@@ -92,7 +92,7 @@ public class GreetingEndpoint {
         	if (authorizationRequestHandler != null) {
         		authorizationRequestHandler.setCode(code);
         	}
-        	client.setUpdatesHandler(new UpdatesHandler(phoneNumber, code));
+        	client.setUpdatesHandler(new UpdatesHandler(phoneNumber, code), new ExceptionHandler());
         }
 
         final String message = String.format(Greeting.FORMAT, phoneNumber);
@@ -603,6 +603,15 @@ public class GreetingEndpoint {
         }
     }
 
+    private static class ExceptionHandler implements Client.ExceptionHandler {
+
+		@Override
+		public void onException(Throwable arg0) {
+			print(arg0.getMessage());
+			arg0.printStackTrace();
+		}
+    }
+    
     private static class OrderedChat implements Comparable<OrderedChat> {
         final long order;
         final long chatId;
