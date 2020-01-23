@@ -61,9 +61,9 @@ public class GreetingEndpoint {
         try {
         	System.out.println("java.library.path " + System.getProperty("java.library.path"));
         	Map<String, String> env = System.getenv();
-            for (String envName : env.keySet()) {
-                System.out.format("%s=%s%n", envName, env.get(envName));
-            }
+            //for (String envName : env.keySet()) {
+            //    System.out.format("%s=%s%n", envName, env.get(envName));
+            //}
             System.loadLibrary("tdjni");
             Client.execute(new TdApi.SetLogVerbosityLevel(0));
             if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
@@ -229,7 +229,7 @@ public class GreetingEndpoint {
                 parameters.useMessageDatabase = true;
                 parameters.useSecretChats = true;
                 parameters.apiId = Integer.valueOf(apiId); 
-                parameters.apiHash = System.getenv("API_PATH"); 
+                parameters.apiHash = apiHash; 
                 parameters.systemLanguageCode = "en";
                 parameters.deviceModel = "Desktop";
                 parameters.systemVersion = "Unknown";
