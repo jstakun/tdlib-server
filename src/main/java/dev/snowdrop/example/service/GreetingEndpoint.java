@@ -61,6 +61,11 @@ public class GreetingEndpoint {
     static {
         try {
             System.loadLibrary("tdjni");
+            
+            Client.execute(new TdApi.SetLogVerbosityLevel(0));
+            if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
+                throw new IOError(new IOException("Write access to the current directory is required"));
+            }
         } catch (UnsatisfiedLinkError e) {
             e.printStackTrace();
         }
@@ -110,7 +115,7 @@ public class GreetingEndpoint {
         return new Greeting(message);
     }
     
-    public static void main(String[] args) throws InterruptedException {
+    /*public static void main(String[] args) throws InterruptedException {
         // disable TDLib log
         Client.execute(new TdApi.SetLogVerbosityLevel(0));
         if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
@@ -135,11 +140,11 @@ public class GreetingEndpoint {
                 authorizationLock.unlock();
             }
 
-            //while (haveAuthorization) {
-            //    getCommand();
-            //}
+            while (haveAuthorization) {
+                getCommand();
+            }
         }
-    }
+    }*/
     
     private static String promptString(String prompt, Object variable) {
         System.out.print(prompt);
