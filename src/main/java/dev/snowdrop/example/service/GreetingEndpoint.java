@@ -458,7 +458,7 @@ public class GreetingEndpoint {
         		TdApi.Chat chat = (TdApi.Chat)object;
         		if (chat.type instanceof TdApi.ChatTypeSupergroup) {
         			TdApi.ChatTypeSupergroup group = (TdApi.ChatTypeSupergroup)chat.type;
-        			client.send(new TdApi.SetSupergroupUsername(group.supergroupId, "@device_locator_bot"), defaultHandler);
+        			client.send(new TdApi.SetSupergroupUsername(group.supergroupId, "device_locator_bot"), defaultHandler);
         		}
         		//client.send(new TdApi.AddChatMember(chat.id, 315688739, 0), defaultHandler);
         	}
