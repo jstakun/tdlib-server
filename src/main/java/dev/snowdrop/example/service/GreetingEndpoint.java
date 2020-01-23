@@ -36,6 +36,8 @@ public class GreetingEndpoint {
 
     private static final Lock authorizationLock = new ReentrantLock();
     private static final Condition gotAuthorization = authorizationLock.newCondition();
+    
+    private static final Object promptLock = new Object();
 
     private static final ConcurrentMap<Integer, TdApi.User> users = new ConcurrentHashMap<Integer, TdApi.User>();
     private static final ConcurrentMap<Integer, TdApi.BasicGroup> basicGroups = new ConcurrentHashMap<Integer, TdApi.BasicGroup>();
@@ -49,10 +51,12 @@ public class GreetingEndpoint {
     private static final ConcurrentMap<Integer, TdApi.UserFullInfo> usersFullInfo = new ConcurrentHashMap<Integer, TdApi.UserFullInfo>();
     private static final ConcurrentMap<Integer, TdApi.BasicGroupFullInfo> basicGroupsFullInfo = new ConcurrentHashMap<Integer, TdApi.BasicGroupFullInfo>();
     private static final ConcurrentMap<Integer, TdApi.SupergroupFullInfo> supergroupsFullInfo = new ConcurrentHashMap<Integer, TdApi.SupergroupFullInfo>();
-
+    
     private static final String newLine = System.getProperty("line.separator");
-    private static final String commandsLine = "Enter command (gcs - GetChats, gc <chatId> - GetChat, me - GetMe, sm <chatId> <message> - SendMessage, lo - LogOut, q - Quit): ";
+    //private static final String commandsLine = "Enter command (gcs - GetChats, gc <chatId> - GetChat, me - GetMe, sm <chatId> <message> - SendMessage, lo - LogOut, q - Quit): ";
     private static volatile String currentPrompt = null;
+    
+    private static String phoneNumber = null, code = null;
 
     static {
         try {
@@ -67,6 +71,8 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
+    	GreetingEndpoint.phoneNumber = phoneNumber;
+    	promptLock.notifyAll();
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber);
         return new Greeting(message);
@@ -77,8 +83,12 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting code(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber, @QueryParam("code") @DefaultValue("0") String code) {
 
-        
-        final String message = String.format(Greeting.FORMAT, phoneNumber);
+    	if (GreetingEndpoint.phoneNumber.equals(phoneNumber)) {
+    		GreetingEndpoint.code = code;
+    	 	promptLock.notifyAll();
+    	}
+    	
+        final String message = String.format(Greeting.FORMAT, phoneNumber + ":" + code);
         return new Greeting(message);
     }
     
@@ -107,10 +117,32 @@ public class GreetingEndpoint {
                 authorizationLock.unlock();
             }
 
-            while (haveAuthorization) {
-                getCommand();
-            }
+            //while (haveAuthorization) {
+            //    getCommand();
+            //}
         }
+    }
+    
+    private static String promptString(String prompt, Object variable) {
+        System.out.print(prompt);
+        currentPrompt = prompt;
+        //TODO wait for providing value
+        /*BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String str = "";
+        try {
+            str = reader.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }*/
+        while (variable == null) {
+        	try {
+        		promptLock.wait();
+        	} catch (Exception e) {
+        		
+        	}
+        }
+        currentPrompt = null;
+        return variable.toString();
     }
     
     private static void print(String str) {
@@ -169,8 +201,8 @@ public class GreetingEndpoint {
                 client.send(new TdApi.CheckDatabaseEncryptionKey(), new AuthorizationRequestHandler());
                 break;
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
-                String phoneNumber = promptString("Please enter phone number: ");
-                client.send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, null), new AuthorizationRequestHandler());
+                String input = promptString("Please enter phone number: ", phoneNumber);
+                client.send(new TdApi.SetAuthenticationPhoneNumber(input, null), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR: {
@@ -179,19 +211,21 @@ public class GreetingEndpoint {
                 break;
             }
             case TdApi.AuthorizationStateWaitCode.CONSTRUCTOR: {
-                String code = promptString("Please enter authentication code: ");
-                client.send(new TdApi.CheckAuthenticationCode(code), new AuthorizationRequestHandler());
+                String input = promptString("Please enter authentication code: ", code);
+                client.send(new TdApi.CheckAuthenticationCode(input), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateWaitRegistration.CONSTRUCTOR: {
-                String firstName = promptString("Please enter your first name: ");
-                String lastName = promptString("Please enter your last name: ");
-                client.send(new TdApi.RegisterUser(firstName, lastName), new AuthorizationRequestHandler());
+            	System.out.println("Not implemented state update AuthorizationStateWaitRegistration");
+            	//String firstName = promptString("Please enter your first name: ");
+                //String lastName = promptString("Please enter your last name: ");
+                //client.send(new TdApi.RegisterUser(firstName, lastName), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateWaitPassword.CONSTRUCTOR: {
-                String password = promptString("Please enter password: ");
-                client.send(new TdApi.CheckAuthenticationPassword(password), new AuthorizationRequestHandler());
+            	System.out.println("Not implemented state update AuthorizationStateWaitPassword");
+            	//String password = promptString("Please enter password: ");
+                //client.send(new TdApi.CheckAuthenticationPassword(password), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateReady.CONSTRUCTOR:
@@ -222,7 +256,7 @@ public class GreetingEndpoint {
         }
     }
 
-    private static int toInt(String arg) {
+    /*private static int toInt(String arg) {
         int result = 0;
         try {
             result = Integer.parseInt(arg);
@@ -238,20 +272,6 @@ public class GreetingEndpoint {
         } catch (NumberFormatException ignored) {
         }
         return chatId;
-    }
-
-    private static String promptString(String prompt) {
-        System.out.print(prompt);
-        currentPrompt = prompt;
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String str = "";
-        try {
-            str = reader.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        currentPrompt = null;
-        return str;
     }
 
     private static void getCommand() {
@@ -353,7 +373,7 @@ public class GreetingEndpoint {
 
         TdApi.InputMessageContent content = new TdApi.InputMessageText(new TdApi.FormattedText(message, null), false, true);
         client.send(new TdApi.SendMessage(chatId, 0, null, replyMarkup, content), defaultHandler);
-    }
+    }*/
 
     private static class OrderedChat implements Comparable<OrderedChat> {
         final long order;
