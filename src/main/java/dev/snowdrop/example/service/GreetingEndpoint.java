@@ -278,7 +278,8 @@ public class GreetingEndpoint {
                 break;
             }
             case TdApi.AuthorizationStateReady.CONSTRUCTOR:
-                client.send(new TdApi.GetMe(), defaultHandler);
+                //client.send(new TdApi.GetMe(), defaultHandler);
+                client.send(new TdApi.GetUser(315688739), defaultHandler);
                 break;
             case TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR:
                 print("Logging out");
@@ -456,7 +457,7 @@ public class GreetingEndpoint {
         		//client.send(new TdApi.LogOut(), defaultHandler);
         	} else if (object instanceof TdApi.Chat) {
         		TdApi.Chat chat = (TdApi.Chat)object;
-        		client.send(new TdApi.AddChatMember(chat.id, -315688739, 0), defaultHandler);
+        		client.send(new TdApi.AddChatMember(chat.id, 315688739, 0), defaultHandler);
         	}
         }
     }
