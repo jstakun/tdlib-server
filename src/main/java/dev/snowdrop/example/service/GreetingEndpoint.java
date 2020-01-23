@@ -2,6 +2,7 @@ package dev.snowdrop.example.service;
 
 import java.io.IOError;
 import java.io.IOException;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,7 +59,11 @@ public class GreetingEndpoint {
 
     static {
         try {
-        	System.out.println("java.library.path " + System.getenv("java.library.path"));
+        	System.out.println("java.library.path " + System.getProperty("java.library.path"));
+        	Map<String, String> env = System.getenv();
+            for (String envName : env.keySet()) {
+                System.out.format("%s=%s%n", envName, env.get(envName));
+            }
             System.loadLibrary("tdjni");
             Client.execute(new TdApi.SetLogVerbosityLevel(0));
             if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
