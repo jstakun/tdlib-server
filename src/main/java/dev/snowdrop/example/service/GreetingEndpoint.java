@@ -36,7 +36,7 @@ public class GreetingEndpoint {
     private static final Lock authorizationLock = new ReentrantLock();
     private static final Condition gotAuthorization = authorizationLock.newCondition();
     
-    private static final Object promptLock = new Object();
+    //private static final Object promptLock = new Object();
 
     private static final ConcurrentMap<Integer, TdApi.User> users = new ConcurrentHashMap<Integer, TdApi.User>();
     private static final ConcurrentMap<Integer, TdApi.BasicGroup> basicGroups = new ConcurrentHashMap<Integer, TdApi.BasicGroup>();
@@ -55,7 +55,7 @@ public class GreetingEndpoint {
     //private static final String commandsLine = "Enter command (gcs - GetChats, gc <chatId> - GetChat, me - GetMe, sm <chatId> <message> - SendMessage, lo - LogOut, q - Quit): ";
     private static volatile String currentPrompt = null;
     
-    private static String phoneNumber = null, code = null;
+    private static String phoneNumber = "", code = "";
 
     static {
         try {
@@ -82,9 +82,9 @@ public class GreetingEndpoint {
     	if (GreetingEndpoint.phoneNumber == null && GreetingEndpoint.code == null) {
     		GreetingEndpoint.phoneNumber = phoneNumber;
     		client = Client.create(new UpdatesHandler(), null, null);
-    		synchronized (promptLock) {
+    		synchronized (GreetingEndpoint.phoneNumber) {
         		try {
-        			promptLock.notifyAll();
+        			GreetingEndpoint.phoneNumber.notifyAll();
         		} catch (Exception e) {
         			e.printStackTrace();
         		}
@@ -104,9 +104,9 @@ public class GreetingEndpoint {
 
     	if (GreetingEndpoint.phoneNumber.equals(phoneNumber)) {
     		GreetingEndpoint.code = code;
-    		synchronized (promptLock) {
+    		synchronized (GreetingEndpoint.code) {
     			try {
-    				promptLock.notifyAll();
+    				GreetingEndpoint.code.notifyAll();
     			} catch (Exception e) {
     				e.printStackTrace();
     			}
@@ -158,17 +158,10 @@ public class GreetingEndpoint {
     private static String promptString(String prompt, Object variable) {
         System.out.print(prompt);
         currentPrompt = prompt;
-        /*BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String str = "";
-        try {
-            str = reader.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }*/
         while (variable == null) {
-        	synchronized (promptLock) {        		
+        	synchronized (variable) {        		
         		try {
-        			promptLock.wait();
+        			variable.wait();
         		} catch (Exception e) {
         		
         		}
