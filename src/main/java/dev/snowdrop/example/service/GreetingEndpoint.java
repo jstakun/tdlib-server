@@ -79,7 +79,7 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
-    	if (GreetingEndpoint.phoneNumber == null && GreetingEndpoint.code == null) {
+    	if (GreetingEndpoint.phoneNumber.equals("") && GreetingEndpoint.code.equals("")) {
     		GreetingEndpoint.phoneNumber = phoneNumber;
     		client = Client.create(new UpdatesHandler(), null, null);
     		synchronized (GreetingEndpoint.phoneNumber) {
@@ -119,8 +119,8 @@ public class GreetingEndpoint {
     	}
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber + ":" + code);
-        phoneNumber = null;
-		code = null;
+        phoneNumber = "";
+		code = "";
         return new Greeting(message);
     }
     
