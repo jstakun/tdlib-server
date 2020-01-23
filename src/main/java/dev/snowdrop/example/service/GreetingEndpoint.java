@@ -456,7 +456,7 @@ public class GreetingEndpoint {
         		//client.send(new TdApi.LogOut(), defaultHandler);
         	} else if (object instanceof TdApi.Chat) {
         		TdApi.Chat chat = (TdApi.Chat)object;
-        		client.send(new TdApi.AddChatMember(chat.id, 315688739, 0), defaultHandler);
+        		client.send(new TdApi.AddChatMember(chat.id, -315688739, 0), defaultHandler);
         	}
         }
     }
