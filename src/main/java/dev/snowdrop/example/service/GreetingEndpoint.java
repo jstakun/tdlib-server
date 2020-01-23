@@ -57,7 +57,7 @@ public class GreetingEndpoint {
             System.loadLibrary("tdjni");
         
             System.out.println("Initializing tdlib client...");
-            client = Client.create(new UpdatesHandler(), null, null);
+            client = Client.create(null, null, null);
             Client.execute(new TdApi.SetLogVerbosityLevel(1));
     		if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
     			throw new IOError(new IOException("Write access to the current directory is required"));
@@ -75,6 +75,7 @@ public class GreetingEndpoint {
     	if (!phoneNumber.equals("unknown")) {
     		AuthorizationRequestHandler authorizationRequestHandler = new AuthorizationRequestHandler(phoneNumber);
     		authHandlers.put(phoneNumber, authorizationRequestHandler);
+    		client.setUpdatesHandler(new UpdatesHandler(phoneNumber));
     	}
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber);
@@ -86,11 +87,12 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting code(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber, @QueryParam("code") @DefaultValue("0") String code) {
 
-        if (!phoneNumber.equals("unknown")) {
+        if (!phoneNumber.equals("unknown") && !code.equals("0")) {
         	AuthorizationRequestHandler authorizationRequestHandler = authHandlers.get(phoneNumber);
         	if (authorizationRequestHandler != null) {
         		authorizationRequestHandler.setCode(code);
         	}
+        	client.setUpdatesHandler(new UpdatesHandler(phoneNumber, code));
         }
 
         final String message = String.format(Greeting.FORMAT, phoneNumber);
@@ -101,7 +103,7 @@ public class GreetingEndpoint {
         //if (authorizationState != null) {
         //    GreetingEndpoint.authorizationState = authorizationState;
         //}
-        print("Updated authn state to " + authorizationState.toString());
+        print("Updated authn state to " + authorizationState.toString() + " for " + phoneNumber + ":" + code);
         switch (authorizationState.getConstructor()) {
             case TdApi.AuthorizationStateWaitTdlibParameters.CONSTRUCTOR:
                 TdApi.TdlibParameters parameters = new TdApi.TdlibParameters();
@@ -171,7 +173,7 @@ public class GreetingEndpoint {
             case TdApi.AuthorizationStateClosed.CONSTRUCTOR:
                 print("Closed");
                 if (!quiting) {
-                    client = Client.create(new UpdatesHandler(), null, null); // recreate client after previous has closed
+                    client = Client.create(null, null, null); // recreate client after previous has closed
                 }
                 break;
             default:
@@ -359,12 +361,25 @@ public class GreetingEndpoint {
     }
 
     private static class UpdatesHandler implements Client.ResultHandler {
-        @Override
+        
+    	private String phoneNumber;
+    	
+    	private String code;
+    	
+    	public UpdatesHandler(String phoneNumber) {
+    		this.phoneNumber = phoneNumber;
+    	}
+    	
+    	public UpdatesHandler(String phoneNumber, String code) {
+    		this.code = code;
+    		this.phoneNumber = phoneNumber;
+    	}
+    	
+    	@Override
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.UpdateAuthorizationState.CONSTRUCTOR:
-                	//TODO fix get correct user phoneNumber and code
-                    onAuthorizationStateUpdated(((TdApi.UpdateAuthorizationState) object).authorizationState, null, null);
+                	onAuthorizationStateUpdated(((TdApi.UpdateAuthorizationState) object).authorizationState, phoneNumber, code);
                     break;
                 case TdApi.UpdateUser.CONSTRUCTOR:
                     TdApi.UpdateUser updateUser = (TdApi.UpdateUser) object;
