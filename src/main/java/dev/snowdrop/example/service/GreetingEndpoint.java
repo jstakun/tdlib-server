@@ -160,7 +160,8 @@ public class GreetingEndpoint {
         System.out.print(prompt);
         currentPrompt = prompt;
         synchronized (variableLock) {     
-        	while (variable == null) {   		
+        	while (variable == null) {   
+        		System.out.println(variable + " is null");
         		try {
         			System.out.println("wait " + GreetingEndpoint.phoneNumber + ":" + GreetingEndpoint.code);
         			variableLock.wait();
