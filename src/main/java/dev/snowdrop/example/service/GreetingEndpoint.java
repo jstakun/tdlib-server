@@ -1,9 +1,7 @@
 package dev.snowdrop.example.service;
 
-import java.io.BufferedReader;
 import java.io.IOError;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,7 +44,7 @@ public class GreetingEndpoint {
 
     private static final ConcurrentMap<Long, TdApi.Chat> chats = new ConcurrentHashMap<Long, TdApi.Chat>();
     private static final NavigableSet<OrderedChat> mainChatList = new TreeSet<OrderedChat>();
-    private static boolean haveFullMainChatList = false;
+    //private static boolean haveFullMainChatList = false;
 
     private static final ConcurrentMap<Integer, TdApi.UserFullInfo> usersFullInfo = new ConcurrentHashMap<Integer, TdApi.UserFullInfo>();
     private static final ConcurrentMap<Integer, TdApi.BasicGroupFullInfo> basicGroupsFullInfo = new ConcurrentHashMap<Integer, TdApi.BasicGroupFullInfo>();
@@ -76,7 +74,7 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
-    	if (client == null) {
+    	if (client == null && phoneNumber == null && code == null) {
     		GreetingEndpoint.phoneNumber = phoneNumber;
     		client = Client.create(new UpdatesHandler(), null, null);
     		try {
@@ -104,9 +102,13 @@ public class GreetingEndpoint {
         	} catch (Exception e) {
         		e.printStackTrace();
         	}
-            //TODO execute group chat creation
-    		client.send(new TdApi.LogOut(), defaultHandler);
+            //TODO execute group chat creation 
+    		
+    		//and logout
+    		//client.send(new TdApi.LogOut(), defaultHandler);
     		client = null;
+    		phoneNumber = null;
+    		code = null;
     	} else {
     		System.out.println("Invalid phoneNumber " + phoneNumber);
     	}
