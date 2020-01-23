@@ -82,10 +82,12 @@ public class GreetingEndpoint {
     	if (GreetingEndpoint.phoneNumber == null && GreetingEndpoint.code == null) {
     		GreetingEndpoint.phoneNumber = phoneNumber;
     		client = Client.create(new UpdatesHandler(), null, null);
-    		try {
-    			promptLock.notifyAll();
-    		} catch (Exception e) {
-    			e.printStackTrace();
+    		synchronized (promptLock) {
+        		try {
+        			promptLock.notifyAll();
+        		} catch (Exception e) {
+        			e.printStackTrace();
+        		}
     		}
     	} else {
     		System.out.println("Please wait. Other session in progress...");
@@ -102,11 +104,13 @@ public class GreetingEndpoint {
 
     	if (GreetingEndpoint.phoneNumber.equals(phoneNumber)) {
     		GreetingEndpoint.code = code;
-    		try {
-        		promptLock.notifyAll();
-        	} catch (Exception e) {
-        		e.printStackTrace();
-        	}
+    		synchronized (promptLock) {
+    			try {
+    				promptLock.notifyAll();
+    			} catch (Exception e) {
+    				e.printStackTrace();
+    			}
+    		}
             //TODO execute group chat creation 
     		client.send(new TdApi.GetMe(), defaultHandler);
     		//and logout
@@ -162,10 +166,12 @@ public class GreetingEndpoint {
             e.printStackTrace();
         }*/
         while (variable == null) {
-        	try {
-        		promptLock.wait();
-        	} catch (Exception e) {
+        	synchronized (promptLock) {        		
+        		try {
+        			promptLock.wait();
+        		} catch (Exception e) {
         		
+        		}
         	}
         }
         currentPrompt = null;
