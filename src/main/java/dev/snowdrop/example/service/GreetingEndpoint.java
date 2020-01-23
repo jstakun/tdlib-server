@@ -28,14 +28,10 @@ public class GreetingEndpoint {
     private static Client client = null;
 
     private static TdApi.AuthorizationState authorizationState = null;
-    private static volatile boolean haveAuthorization = false;
     private static volatile boolean quiting = false;
 
     private static final Client.ResultHandler defaultHandler = new DefaultHandler();
 
-    private static final Lock authorizationLock = new ReentrantLock();
-    private static final Condition gotAuthorization = authorizationLock.newCondition();
-    
     private static final Object codeLock = new Object();
     private static final Object pnLock = new Object();
 
@@ -114,10 +110,6 @@ public class GreetingEndpoint {
     				e.printStackTrace();
     			}
     		}
-            //TODO execute group chat creation 
-    		//client.send(new TdApi.GetMe(), defaultHandler);
-            //and logout
-    		client.send(new TdApi.LogOut(), defaultHandler);
     	} else {
     		System.out.println("Invalid phoneNumber " + phoneNumber);
     	}
@@ -286,20 +278,12 @@ public class GreetingEndpoint {
                 break;
             }
             case TdApi.AuthorizationStateReady.CONSTRUCTOR:
-                haveAuthorization = true;
-                authorizationLock.lock();
-                try {
-                    gotAuthorization.signal();
-                } finally {
-                    authorizationLock.unlock();
-                }
+                client.send(new TdApi.GetMe(), defaultHandler);
                 break;
             case TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR:
-                haveAuthorization = false;
                 print("Logging out");
                 break;
             case TdApi.AuthorizationStateClosing.CONSTRUCTOR:
-                haveAuthorization = false;
                 print("Closing");
                 break;
             case TdApi.AuthorizationStateClosed.CONSTRUCTOR:
@@ -462,7 +446,14 @@ public class GreetingEndpoint {
     private static class DefaultHandler implements Client.ResultHandler {
         @Override
         public void onResult(TdApi.Object object) {
-            print(object.toString());
+        	print(object.toString());
+        	if (object instanceof TdApi.User) {
+        		TdApi.User me = (TdApi.User)object;
+        		//TODO execute group chat creation 
+        		client.send(new TdApi.CreateNewBasicGroupChat(new int[] {me.id}, "Device XYZ notifications " + System.currentTimeMillis()), defaultHandler);
+                //and logout
+        		//client.send(new TdApi.LogOut(), defaultHandler);
+        	}
         }
     }
 
