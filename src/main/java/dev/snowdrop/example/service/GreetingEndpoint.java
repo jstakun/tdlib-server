@@ -156,23 +156,38 @@ public class GreetingEndpoint {
         }
     }*/
     
-    private static String promptString(String prompt, String variable, Object variableLock) {
+    private static String promptPhoneNumber(String prompt) {
         System.out.print(prompt);
         currentPrompt = prompt;
-        synchronized (variableLock) {     
-        	while (variable == null) {   
-        		System.out.println(variable + " is null");
+        synchronized (pnLock) {     
+        	while (GreetingEndpoint.phoneNumber == null) {   
         		try {
-        			System.out.println("wait " + GreetingEndpoint.phoneNumber + ":" + GreetingEndpoint.code);
-        			variableLock.wait();
+        			pnLock.wait();
         		} catch (Exception e) {
         			e.printStackTrace();
         		}
         	}
         }
         currentPrompt = null;
-        System.out.println(variable + ". Done.");
-        return variable.toString();
+        System.out.println(GreetingEndpoint.phoneNumber + ". Done.");
+        return GreetingEndpoint.phoneNumber;
+    }
+    
+    private static String promptCode(String prompt) {
+        System.out.print(prompt);
+        currentPrompt = prompt;
+        synchronized (codeLock) {     
+        	while (GreetingEndpoint.code == null) {   
+        		try {
+        			codeLock.wait();
+        		} catch (Exception e) {
+        			e.printStackTrace();
+        		}
+        	}
+        }
+        currentPrompt = null;
+        System.out.println(GreetingEndpoint.code + ". Done.");
+        return GreetingEndpoint.code;
     }
     
     private static void print(String str) {
@@ -242,7 +257,7 @@ public class GreetingEndpoint {
                 client.send(new TdApi.CheckDatabaseEncryptionKey(), new AuthorizationRequestHandler());
                 break;
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
-                String input = promptString("Please enter phone number: ", GreetingEndpoint.phoneNumber, pnLock);
+                String input = promptPhoneNumber("Please enter phone number: ");
                 client.send(new TdApi.SetAuthenticationPhoneNumber(input, null), new AuthorizationRequestHandler());
                 break;
             }
@@ -252,7 +267,7 @@ public class GreetingEndpoint {
                 break;
             }
             case TdApi.AuthorizationStateWaitCode.CONSTRUCTOR: {
-                String input = promptString("Please enter authentication code: ", GreetingEndpoint.code, codeLock);
+                String input = promptCode("Please enter authentication code: ");
                 client.send(new TdApi.CheckAuthenticationCode(input), new AuthorizationRequestHandler());
                 break;
             }
