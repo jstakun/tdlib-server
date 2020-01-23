@@ -85,7 +85,8 @@ public class GreetingEndpoint {
     		client = Client.create(new UpdatesHandler(), null, null);
     		synchronized (pnLock) {
         		try {
-        			pnLock.notifyAll();
+        			System.out.println("pnLock notifyAll");
+    				pnLock.notifyAll();
         		} catch (Exception e) {
         			e.printStackTrace();
         		}
@@ -107,6 +108,7 @@ public class GreetingEndpoint {
     		GreetingEndpoint.code = code;
     		synchronized (codeLock) {
     			try {
+    				System.out.println("codeLock notifyAll");
     				codeLock.notifyAll();
     			} catch (Exception e) {
     				e.printStackTrace();
@@ -162,6 +164,7 @@ public class GreetingEndpoint {
         while (variable == null) {
         	synchronized (variableLock) {        		
         		try {
+        			System.out.println("wait " + variable);
         			variableLock.wait();
         		} catch (Exception e) {
         			e.printStackTrace();
