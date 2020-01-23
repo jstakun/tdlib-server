@@ -203,6 +203,7 @@ public class GreetingEndpoint {
         if (authorizationState != null) {
             GreetingEndpoint.authorizationState = authorizationState;
         }
+        System.out.println("Received authorization state update: " + GreetingEndpoint.authorizationState.toString());
         switch (GreetingEndpoint.authorizationState.getConstructor()) {
             case TdApi.AuthorizationStateWaitTdlibParameters.CONSTRUCTOR:
                 TdApi.TdlibParameters parameters = new TdApi.TdlibParameters();
