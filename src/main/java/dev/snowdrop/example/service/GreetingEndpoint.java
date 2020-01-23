@@ -74,7 +74,7 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
-    	if (client == null && phoneNumber == null && code == null) {
+    	if (client == null && GreetingEndpoint.phoneNumber == null && GreetingEndpoint.code == null) {
     		GreetingEndpoint.phoneNumber = phoneNumber;
     		client = Client.create(new UpdatesHandler(), null, null);
     		try {
