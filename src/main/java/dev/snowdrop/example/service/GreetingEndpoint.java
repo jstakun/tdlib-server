@@ -161,8 +161,8 @@ public class GreetingEndpoint {
     private static String promptString(String prompt, String variable, Object variableLock) {
         System.out.print(prompt);
         currentPrompt = prompt;
-        while (variable == null) {
-        	synchronized (variableLock) {        		
+        synchronized (variableLock) {     
+        	while (variable == null) {   		
         		try {
         			System.out.println("wait " + variable);
         			variableLock.wait();
@@ -243,7 +243,7 @@ public class GreetingEndpoint {
                 client.send(new TdApi.CheckDatabaseEncryptionKey(), new AuthorizationRequestHandler());
                 break;
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
-                String input = promptString("Please enter phone number: ", phoneNumber, pnLock);
+                String input = promptString("Please enter phone number: ", GreetingEndpoint.phoneNumber, pnLock);
                 client.send(new TdApi.SetAuthenticationPhoneNumber(input, null), new AuthorizationRequestHandler());
                 break;
             }
@@ -253,7 +253,7 @@ public class GreetingEndpoint {
                 break;
             }
             case TdApi.AuthorizationStateWaitCode.CONSTRUCTOR: {
-                String input = promptString("Please enter authentication code: ", code, codeLock);
+                String input = promptString("Please enter authentication code: ", GreetingEndpoint.code, codeLock);
                 client.send(new TdApi.CheckAuthenticationCode(input), new AuthorizationRequestHandler());
                 break;
             }
