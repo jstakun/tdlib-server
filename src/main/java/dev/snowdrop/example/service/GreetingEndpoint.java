@@ -164,7 +164,7 @@ public class GreetingEndpoint {
         	}
         }
         currentPrompt = null;
-        System.out.println(" " + variable + ". Done.");
+        System.out.println(variable + ". Done.");
         return variable.toString();
     }
     
