@@ -71,12 +71,17 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
-    	GreetingEndpoint.phoneNumber = phoneNumber;
-    	try {
-    		promptLock.notifyAll();
-    	} catch (Exception e) {
-    		e.printStackTrace();
+    	if (client == null) {
+    		GreetingEndpoint.phoneNumber = phoneNumber;
+    		try {
+    			promptLock.notifyAll();
+    		} catch (Exception e) {
+    			e.printStackTrace();
+    		}
+    	} else {
+    		System.out.println("Please wait. Other session in progress...");
     	}
+    	
         final String message = String.format(Greeting.FORMAT, phoneNumber);
         return new Greeting(message);
     }
@@ -93,6 +98,8 @@ public class GreetingEndpoint {
         	} catch (Exception e) {
         		e.printStackTrace();
         	}
+    	} else {
+    		System.out.println("Invalid phoneNumber " + phoneNumber);
     	}
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber + ":" + code);
