@@ -79,7 +79,7 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
-    	if (client == null && GreetingEndpoint.phoneNumber == null && GreetingEndpoint.code == null) {
+    	if (GreetingEndpoint.phoneNumber == null && GreetingEndpoint.code == null) {
     		GreetingEndpoint.phoneNumber = phoneNumber;
     		client = Client.create(new UpdatesHandler(), null, null);
     		try {
@@ -108,17 +108,15 @@ public class GreetingEndpoint {
         		e.printStackTrace();
         	}
             //TODO execute group chat creation 
-    		
+    		client.send(new TdApi.GetMe(), defaultHandler);
     		//and logout
-    		//client.send(new TdApi.LogOut(), defaultHandler);
-    		client = null;
-    		phoneNumber = null;
-    		code = null;
     	} else {
     		System.out.println("Invalid phoneNumber " + phoneNumber);
     	}
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber + ":" + code);
+        phoneNumber = null;
+		code = null;
         return new Greeting(message);
     }
     
