@@ -72,8 +72,11 @@ public class GreetingEndpoint {
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
     	GreetingEndpoint.phoneNumber = phoneNumber;
-    	promptLock.notifyAll();
-    	
+    	try {
+    		promptLock.notifyAll();
+    	} catch (Exception e) {
+    		e.printStackTrace();
+    	}
         final String message = String.format(Greeting.FORMAT, phoneNumber);
         return new Greeting(message);
     }
@@ -85,7 +88,11 @@ public class GreetingEndpoint {
 
     	if (GreetingEndpoint.phoneNumber.equals(phoneNumber)) {
     		GreetingEndpoint.code = code;
-    	 	promptLock.notifyAll();
+    		try {
+        		promptLock.notifyAll();
+        	} catch (Exception e) {
+        		e.printStackTrace();
+        	}
     	}
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber + ":" + code);
