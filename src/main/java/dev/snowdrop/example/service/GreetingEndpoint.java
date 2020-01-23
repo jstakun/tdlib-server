@@ -116,8 +116,6 @@ public class GreetingEndpoint {
     		}
             //TODO execute group chat creation 
     		client.send(new TdApi.GetMe(), defaultHandler);
-    		GreetingEndpoint.phoneNumber = null;
-            GreetingEndpoint.code = null;
             //and logout
     	} else {
     		System.out.println("Invalid phoneNumber " + phoneNumber);
