@@ -73,6 +73,7 @@ public class GreetingEndpoint {
         
     	if (client == null) {
     		GreetingEndpoint.phoneNumber = phoneNumber;
+    		client = Client.create(new UpdatesHandler(), null, null);
     		try {
     			promptLock.notifyAll();
     		} catch (Exception e) {
@@ -98,6 +99,9 @@ public class GreetingEndpoint {
         	} catch (Exception e) {
         		e.printStackTrace();
         	}
+            //TODO execute group chat creation
+    		client.send(new TdApi.LogOut(), defaultHandler);
+    		client = null;
     	} else {
     		System.out.println("Invalid phoneNumber " + phoneNumber);
     	}
@@ -140,7 +144,6 @@ public class GreetingEndpoint {
     private static String promptString(String prompt, Object variable) {
         System.out.print(prompt);
         currentPrompt = prompt;
-        //TODO wait for providing value
         /*BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         String str = "";
         try {
