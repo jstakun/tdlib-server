@@ -636,16 +636,12 @@ public class GreetingEndpoint {
     }
 
     private static class AuthorizationRequestHandler implements Client.ResultHandler {
-    	int retryCount = 3;
-        @Override
+    	@Override
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.Error.CONSTRUCTOR:
-                    System.err.println("Receive an error:" + newLine + object);
-                    if (retryCount > 0) {
-                    	retryCount--;
-                    	onAuthorizationStateUpdated(null); // repeat last action
-                    }
+                    System.err.println("Received an error:" + newLine + object);
+                    //onAuthorizationStateUpdated(null); // repeat last action
                     break;
                 case TdApi.Ok.CONSTRUCTOR:
                     // result is already received through UpdateAuthorizationState, nothing to do
