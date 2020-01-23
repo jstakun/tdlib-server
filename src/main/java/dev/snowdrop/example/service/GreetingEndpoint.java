@@ -448,12 +448,15 @@ public class GreetingEndpoint {
         public void onResult(TdApi.Object object) {
         	print(object.toString());
         	if (object instanceof TdApi.User) {
-        		TdApi.User me = (TdApi.User)object;
+        		//TdApi.User me = (TdApi.User)object;
         		//TODO execute group chat creation 
         		//client.send(new TdApi.CreateNewBasicGroupChat(new int[] {me.id, 315688739}, "Device XYZ notifications " + System.currentTimeMillis()), defaultHandler);
         		client.send(new TdApi.CreateNewSupergroupChat("Device XYZ notifications " + System.currentTimeMillis(), true, "Device Locator", null), defaultHandler);
         		//and logout
         		//client.send(new TdApi.LogOut(), defaultHandler);
+        	} else if (object instanceof TdApi.Chat) {
+        		TdApi.Chat chat = (TdApi.Chat)object;
+        		client.send(new TdApi.AddChatMember(chat.id, 315688739, 0), defaultHandler);
         	}
         }
     }
