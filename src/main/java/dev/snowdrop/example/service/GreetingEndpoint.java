@@ -1,11 +1,16 @@
 package dev.snowdrop.example.service;
 
+import java.io.BufferedReader;
 import java.io.IOError;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -23,14 +28,14 @@ public class GreetingEndpoint {
 
     private static Client client = null;
 
-    //private static TdApi.AuthorizationState authorizationState = null;
-    //private static volatile boolean haveAuthorization = false;
+    private static TdApi.AuthorizationState authorizationState = null;
+    private static volatile boolean haveAuthorization = false;
     private static volatile boolean quiting = false;
 
     private static final Client.ResultHandler defaultHandler = new DefaultHandler();
 
-    //private static final Lock authorizationLock = new ReentrantLock();
-    //private static final Condition gotAuthorization = authorizationLock.newCondition();
+    private static final Lock authorizationLock = new ReentrantLock();
+    private static final Condition gotAuthorization = authorizationLock.newCondition();
 
     private static final ConcurrentMap<Integer, TdApi.User> users = new ConcurrentHashMap<Integer, TdApi.User>();
     private static final ConcurrentMap<Integer, TdApi.BasicGroup> basicGroups = new ConcurrentHashMap<Integer, TdApi.BasicGroup>();
@@ -39,29 +44,19 @@ public class GreetingEndpoint {
 
     private static final ConcurrentMap<Long, TdApi.Chat> chats = new ConcurrentHashMap<Long, TdApi.Chat>();
     private static final NavigableSet<OrderedChat> mainChatList = new TreeSet<OrderedChat>();
-    //private static boolean haveFullMainChatList = false;
-    
+    private static boolean haveFullMainChatList = false;
+
     private static final ConcurrentMap<Integer, TdApi.UserFullInfo> usersFullInfo = new ConcurrentHashMap<Integer, TdApi.UserFullInfo>();
     private static final ConcurrentMap<Integer, TdApi.BasicGroupFullInfo> basicGroupsFullInfo = new ConcurrentHashMap<Integer, TdApi.BasicGroupFullInfo>();
     private static final ConcurrentMap<Integer, TdApi.SupergroupFullInfo> supergroupsFullInfo = new ConcurrentHashMap<Integer, TdApi.SupergroupFullInfo>();
 
     private static final String newLine = System.getProperty("line.separator");
-    //private static final String commandsLine = "Enter command (gcs - GetChats, gc <chatId> - GetChat, me - GetMe, sm <chatId> <message> - SendMessage, lo - LogOut, q - Quit): ";
+    private static final String commandsLine = "Enter command (gcs - GetChats, gc <chatId> - GetChat, me - GetMe, sm <chatId> <message> - SendMessage, lo - LogOut, q - Quit): ";
     private static volatile String currentPrompt = null;
-    
-    private static final ConcurrentMap<String, AuthorizationRequestHandler> authHandlers = new ConcurrentHashMap<String, AuthorizationRequestHandler>();
-    
+
     static {
         try {
-            System.out.println("java.library.path: " + System.getProperty("java.library.path"));  
             System.loadLibrary("tdjni");
-        
-            System.out.println("Initializing tdlib client...");
-            client = Client.create(null, null, null);
-            Client.execute(new TdApi.SetLogVerbosityLevel(1));
-    		if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
-    			throw new IOError(new IOException("Write access to the current directory is required"));
-    		}
         } catch (UnsatisfiedLinkError e) {
             e.printStackTrace();
         }
@@ -72,11 +67,6 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting greeting(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber) {
         
-    	if (!phoneNumber.equals("unknown")) {
-    		AuthorizationRequestHandler authorizationRequestHandler = new AuthorizationRequestHandler(phoneNumber);
-    		authHandlers.put(phoneNumber, authorizationRequestHandler);
-    		client.setUpdatesHandler(new UpdatesHandler(phoneNumber), new ExceptionHandler());
-    	}
     	
         final String message = String.format(Greeting.FORMAT, phoneNumber);
         return new Greeting(message);
@@ -87,119 +77,170 @@ public class GreetingEndpoint {
     @Produces("application/json")
     public Greeting code(@QueryParam("phoneNumber") @DefaultValue("unknown") String phoneNumber, @QueryParam("code") @DefaultValue("0") String code) {
 
-        if (!phoneNumber.equals("unknown") && !code.equals("0")) {
-        	AuthorizationRequestHandler authorizationRequestHandler = authHandlers.get(phoneNumber);
-        	if (authorizationRequestHandler != null) {
-        		authorizationRequestHandler.setCode(code);
-        	}
-        	client.setUpdatesHandler(new UpdatesHandler(phoneNumber, code), new ExceptionHandler());
-        }
-
+        
         final String message = String.format(Greeting.FORMAT, phoneNumber);
         return new Greeting(message);
     }
     
-    private static void onAuthorizationStateUpdated(TdApi.AuthorizationState authorizationState, String phoneNumber, String code) {
-        //if (authorizationState != null) {
-        //    GreetingEndpoint.authorizationState = authorizationState;
-        //}
-        print("Updated authn state to " + authorizationState.toString() + " for " + phoneNumber + ":" + code);
-        switch (authorizationState.getConstructor()) {
+    public static void main(String[] args) throws InterruptedException {
+        // disable TDLib log
+        Client.execute(new TdApi.SetLogVerbosityLevel(0));
+        if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
+            throw new IOError(new IOException("Write access to the current directory is required"));
+        }
+
+        // create client
+        client = Client.create(new UpdatesHandler(), null, null);
+
+        // test Client.execute
+        defaultHandler.onResult(Client.execute(new TdApi.GetTextEntities("@telegram /test_command https://telegram.org telegram.me @gif @test")));
+
+        // main loop
+        while (!quiting) {
+            // await authorization
+            authorizationLock.lock();
+            try {
+                while (!haveAuthorization) {
+                    gotAuthorization.await();
+                }
+            } finally {
+                authorizationLock.unlock();
+            }
+
+            while (haveAuthorization) {
+                getCommand();
+            }
+        }
+    }
+    
+    private static void print(String str) {
+        if (currentPrompt != null) {
+            System.out.println("");
+        }
+        System.out.println(str);
+        if (currentPrompt != null) {
+            System.out.print(currentPrompt);
+        }
+    }
+
+    private static void setChatOrder(TdApi.Chat chat, long order) {
+        synchronized (mainChatList) {
+            synchronized (chat) {
+                if (chat.chatList == null || chat.chatList.getConstructor() != TdApi.ChatListMain.CONSTRUCTOR) {
+                  return;
+                }
+
+                if (chat.order != 0) {
+                    boolean isRemoved = mainChatList.remove(new OrderedChat(chat.order, chat.id));
+                    assert isRemoved;
+                }
+
+                chat.order = order;
+
+                if (chat.order != 0) {
+                    boolean isAdded = mainChatList.add(new OrderedChat(chat.order, chat.id));
+                    assert isAdded;
+                }
+            }
+        }
+    }
+
+    private static void onAuthorizationStateUpdated(TdApi.AuthorizationState authorizationState) {
+        if (authorizationState != null) {
+            GreetingEndpoint.authorizationState = authorizationState;
+        }
+        switch (GreetingEndpoint.authorizationState.getConstructor()) {
             case TdApi.AuthorizationStateWaitTdlibParameters.CONSTRUCTOR:
                 TdApi.TdlibParameters parameters = new TdApi.TdlibParameters();
-                parameters.databaseDirectory = "tdlibdb";
+                parameters.databaseDirectory = "tdlib";
                 parameters.useMessageDatabase = true;
                 parameters.useSecretChats = true;
                 parameters.apiId = 94575;
                 parameters.apiHash = "a3406de8d171bb422bb6ddf3bbd800e2";
                 parameters.systemLanguageCode = "en";
-                parameters.deviceModel = "OpenShift Online";
-                parameters.systemVersion = "RHEL7";
+                parameters.deviceModel = "Desktop";
+                parameters.systemVersion = "Unknown";
                 parameters.applicationVersion = "1.0";
                 parameters.enableStorageOptimizer = true;
-                client.send(new TdApi.SetTdlibParameters(parameters), authHandlers.get(phoneNumber));
+
+                client.send(new TdApi.SetTdlibParameters(parameters), new AuthorizationRequestHandler());
                 break;
             case TdApi.AuthorizationStateWaitEncryptionKey.CONSTRUCTOR:
-                client.send(new TdApi.CheckDatabaseEncryptionKey(), authHandlers.get(phoneNumber));
+                client.send(new TdApi.CheckDatabaseEncryptionKey(), new AuthorizationRequestHandler());
                 break;
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
-                //String phoneNumber = promptString("Please enter phone number: ");
-                client.send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, null), authHandlers.get(phoneNumber));
+                String phoneNumber = promptString("Please enter phone number: ");
+                client.send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, null), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR: {
-            	System.out.println("Not implemented!");
-                //String link = ((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) authorizationState).link;
-                //System.out.println("Please confirm this login link on another device: " + link);
+                String link = ((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) GreetingEndpoint.authorizationState).link;
+                System.out.println("Please confirm this login link on another device: " + link);
                 break;
             }
             case TdApi.AuthorizationStateWaitCode.CONSTRUCTOR: {
-                //String code = promptString("Please enter authentication code: ");
-                client.send(new TdApi.CheckAuthenticationCode(code), authHandlers.get(phoneNumber));
+                String code = promptString("Please enter authentication code: ");
+                client.send(new TdApi.CheckAuthenticationCode(code), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateWaitRegistration.CONSTRUCTOR: {
-            	System.out.println("Not implemented!");
-                //String firstName = promptString("Please enter your first name: ");
-                //String lastName = promptString("Please enter your last name: ");
-                //client.send(new TdApi.RegisterUser(firstName, lastName), new AuthorizationRequestHandler());
+                String firstName = promptString("Please enter your first name: ");
+                String lastName = promptString("Please enter your last name: ");
+                client.send(new TdApi.RegisterUser(firstName, lastName), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateWaitPassword.CONSTRUCTOR: {
-            	System.out.println("Not implemented!");
-                //String password = promptString("Please enter password: ");
-                //client.send(new TdApi.CheckAuthenticationPassword(password), new AuthorizationRequestHandler());
+                String password = promptString("Please enter password: ");
+                client.send(new TdApi.CheckAuthenticationPassword(password), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateReady.CONSTRUCTOR:
-                //haveAuthorization = true;
-                //authorizationLock.lock();
-                //try {
-                //    gotAuthorization.signal();
-                //} finally {
-                //    authorizationLock.unlock();
-                //}
-                client.send(new TdApi.GetMe(), defaultHandler);
+                haveAuthorization = true;
+                authorizationLock.lock();
+                try {
+                    gotAuthorization.signal();
+                } finally {
+                    authorizationLock.unlock();
+                }
                 break;
             case TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR:
-                //haveAuthorization = false;
-            	authHandlers.remove(phoneNumber);
-            	print("Logging out");
+                haveAuthorization = false;
+                print("Logging out");
                 break;
             case TdApi.AuthorizationStateClosing.CONSTRUCTOR:
-                //haveAuthorization = false;
+                haveAuthorization = false;
                 print("Closing");
                 break;
             case TdApi.AuthorizationStateClosed.CONSTRUCTOR:
                 print("Closed");
                 if (!quiting) {
-                    client = Client.create(null, null, null); // recreate client after previous has closed
+                    client = Client.create(new UpdatesHandler(), null, null); // recreate client after previous has closed
                 }
                 break;
             default:
-                System.err.println("Unsupported authorization state:" + newLine + authorizationState);
+                System.err.println("Unsupported authorization state:" + newLine + GreetingEndpoint.authorizationState);
         }
     }
 
-    /*private static int toInt(String arg) {
+    private static int toInt(String arg) {
         int result = 0;
         try {
             result = Integer.parseInt(arg);
         } catch (NumberFormatException ignored) {
         }
         return result;
-    }*/
+    }
 
-    /*private static long getChatId(String arg) {
+    private static long getChatId(String arg) {
         long chatId = 0;
         try {
             chatId = Long.parseLong(arg);
         } catch (NumberFormatException ignored) {
         }
         return chatId;
-    }*/
+    }
 
-    /*private static String promptString(String prompt) {
+    private static String promptString(String prompt) {
         System.out.print(prompt);
         currentPrompt = prompt;
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
@@ -211,9 +252,9 @@ public class GreetingEndpoint {
         }
         currentPrompt = null;
         return str;
-    }*/
+    }
 
-    /*private static void getCommand() {
+    private static void getCommand() {
         String command = promptString(commandsLine);
         String[] commands = command.split(" ", 2);
         try {
@@ -238,12 +279,12 @@ public class GreetingEndpoint {
                     break;
                 }
                 case "lo":
-                    //haveAuthorization = false;
+                    haveAuthorization = false;
                     client.send(new TdApi.LogOut(), defaultHandler);
                     break;
                 case "q":
                     quiting = true;
-                    //haveAuthorization = false;
+                    haveAuthorization = false;
                     client.send(new TdApi.Close(), defaultHandler);
                     break;
                 default:
@@ -252,9 +293,9 @@ public class GreetingEndpoint {
         } catch (ArrayIndexOutOfBoundsException e) {
             print("Not enough arguments");
         }
-    }*/
+    }
 
-    /*private static void getMainChatList(final int limit) {
+    private static void getMainChatList(final int limit) {
         synchronized (mainChatList) {
             if (!haveFullMainChatList && limit > mainChatList.size()) {
                 // have enough chats in the chat list or chat list is too small
@@ -303,84 +344,59 @@ public class GreetingEndpoint {
             }
             print("");
         }
-    }*/
+    }
 
-    /*private static void sendMessage(long chatId, String message) {
+    private static void sendMessage(long chatId, String message) {
         // initialize reply markup just for testing
         TdApi.InlineKeyboardButton[] row = {new TdApi.InlineKeyboardButton("https://telegram.org?1", new TdApi.InlineKeyboardButtonTypeUrl()), new TdApi.InlineKeyboardButton("https://telegram.org?2", new TdApi.InlineKeyboardButtonTypeUrl()), new TdApi.InlineKeyboardButton("https://telegram.org?3", new TdApi.InlineKeyboardButtonTypeUrl())};
         TdApi.ReplyMarkup replyMarkup = new TdApi.ReplyMarkupInlineKeyboard(new TdApi.InlineKeyboardButton[][]{row, row, row});
 
         TdApi.InputMessageContent content = new TdApi.InputMessageText(new TdApi.FormattedText(message, null), false, true);
         client.send(new TdApi.SendMessage(chatId, 0, null, replyMarkup, content), defaultHandler);
-    }*/
-    
-    private static void print(String str) {
-        if (currentPrompt != null) {
-            System.out.println("");
-        }
-        System.out.println(str);
-        if (currentPrompt != null) {
-            System.out.print(currentPrompt);
-        }
     }
 
-    private static void setChatOrder(TdApi.Chat chat, long order) {
-        synchronized (mainChatList) {
-            synchronized (chat) {
-                if (chat.chatList == null || chat.chatList.getConstructor() != TdApi.ChatListMain.CONSTRUCTOR) {
-                  return;
-                }
+    private static class OrderedChat implements Comparable<OrderedChat> {
+        final long order;
+        final long chatId;
 
-                if (chat.order != 0) {
-                    boolean isRemoved = mainChatList.remove(new OrderedChat(chat.order, chat.id));
-                    assert isRemoved;
-                }
+        OrderedChat(long order, long chatId) {
+            this.order = order;
+            this.chatId = chatId;
+        }
 
-                chat.order = order;
-
-                if (chat.order != 0) {
-                    boolean isAdded = mainChatList.add(new OrderedChat(chat.order, chat.id));
-                    assert isAdded;
-                }
+        @Override
+        public int compareTo(OrderedChat o) {
+            if (this.order != o.order) {
+                return o.order < this.order ? -1 : 1;
             }
+            if (this.chatId != o.chatId) {
+                return o.chatId < this.chatId ? -1 : 1;
+            }
+            return 0;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            OrderedChat o = (OrderedChat) obj;
+            return this.order == o.order && this.chatId == o.chatId;
         }
     }
 
     private static class DefaultHandler implements Client.ResultHandler {
         @Override
         public void onResult(TdApi.Object object) {
-            print("Received " + object.getClass().getName());  
             print(object.toString());
-            if (object instanceof TdApi.User) {
-            	TdApi.User me = (TdApi.User)object;
-                //315688739 is @device_locator_bot id
-                print("Creating group chat for " + me.id + " and @device_locator_bot");
-                client.send(new TdApi.CreateNewBasicGroupChat(new int[] {315688739, me.id}, "Device XYZ notifications " + System.currentTimeMillis()) , defaultHandler);
-            }
         }
     }
 
     private static class UpdatesHandler implements Client.ResultHandler {
-        
-    	private String phoneNumber;
-    	
-    	private String code;
-    	
-    	public UpdatesHandler(String phoneNumber) {
-    		this.phoneNumber = phoneNumber;
-    	}
-    	
-    	public UpdatesHandler(String phoneNumber, String code) {
-    		this.code = code;
-    		this.phoneNumber = phoneNumber;
-    	}
-    	
-    	@Override
+        @Override
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.UpdateAuthorizationState.CONSTRUCTOR:
-                	onAuthorizationStateUpdated(((TdApi.UpdateAuthorizationState) object).authorizationState, phoneNumber, code);
+                    onAuthorizationStateUpdated(((TdApi.UpdateAuthorizationState) object).authorizationState);
                     break;
+
                 case TdApi.UpdateUser.CONSTRUCTOR:
                     TdApi.UpdateUser updateUser = (TdApi.UpdateUser) object;
                     users.put(updateUser.user.id, updateUser.user);
@@ -574,25 +590,12 @@ public class GreetingEndpoint {
     }
 
     private static class AuthorizationRequestHandler implements Client.ResultHandler {
-    	
-    	private String phoneNumber;
-    	
-    	private String code;
-    	
-    	public AuthorizationRequestHandler(String phoneNumber) {
-    		this.phoneNumber = phoneNumber;
-    	}
-    	
-    	public void setCode(String code) {
-    		this.code = code;
-    	}
-    	
         @Override
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.Error.CONSTRUCTOR:
                     System.err.println("Receive an error:" + newLine + object);
-                    onAuthorizationStateUpdated(null, phoneNumber, code); // repeat last action
+                    onAuthorizationStateUpdated(null); // repeat last action
                     break;
                 case TdApi.Ok.CONSTRUCTOR:
                     // result is already received through UpdateAuthorizationState, nothing to do
@@ -600,42 +603,6 @@ public class GreetingEndpoint {
                 default:
                     System.err.println("Receive wrong response from TDLib:" + newLine + object);
             }
-        }
-    }
-
-    private static class ExceptionHandler implements Client.ExceptionHandler {
-
-		@Override
-		public void onException(Throwable arg0) {
-			print(arg0.getMessage());
-			arg0.printStackTrace();
-		}
-    }
-    
-    private static class OrderedChat implements Comparable<OrderedChat> {
-        final long order;
-        final long chatId;
-
-        OrderedChat(long order, long chatId) {
-            this.order = order;
-            this.chatId = chatId;
-        }
-
-        @Override
-        public int compareTo(OrderedChat o) {
-            if (this.order != o.order) {
-                return o.order < this.order ? -1 : 1;
-            }
-            if (this.chatId != o.chatId) {
-                return o.chatId < this.chatId ? -1 : 1;
-            }
-            return 0;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            OrderedChat o = (OrderedChat) obj;
-            return this.order == o.order && this.chatId == o.chatId;
         }
     }
 }
