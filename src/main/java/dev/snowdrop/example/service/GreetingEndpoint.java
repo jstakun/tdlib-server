@@ -58,8 +58,8 @@ public class GreetingEndpoint {
 
     static {
         try {
+        	System.out.println("java.library.path " + System.getenv("java.library.path"));
             System.loadLibrary("tdjni");
-            
             Client.execute(new TdApi.SetLogVerbosityLevel(0));
             if (Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27))) instanceof TdApi.Error) {
                 throw new IOError(new IOException("Write access to the current directory is required"));
@@ -209,12 +209,22 @@ public class GreetingEndpoint {
         System.out.println("Received authorization state update: " + GreetingEndpoint.authorizationState.toString());
         switch (GreetingEndpoint.authorizationState.getConstructor()) {
             case TdApi.AuthorizationStateWaitTdlibParameters.CONSTRUCTOR:
+            	String apiId = System.getenv("API_ID");
+            	if (apiId == null) {
+            		apiId = "94575";
+            	}
+            	String apiHash = System.getenv("API_HASH");
+            	if (apiHash == null) {
+            		apiHash = "a3406de8d171bb422bb6ddf3bbd800e2";
+            	}
+            	System.out.println("API_ID: " + apiId);
+            	System.out.println("API_HASH: " + apiHash);
                 TdApi.TdlibParameters parameters = new TdApi.TdlibParameters();
                 parameters.databaseDirectory = "tdlib";
                 parameters.useMessageDatabase = true;
                 parameters.useSecretChats = true;
-                parameters.apiId = 94575;
-                parameters.apiHash = "a3406de8d171bb422bb6ddf3bbd800e2";
+                parameters.apiId = Integer.valueOf(apiId); 
+                parameters.apiHash = System.getenv("API_PATH"); 
                 parameters.systemLanguageCode = "en";
                 parameters.deviceModel = "Desktop";
                 parameters.systemVersion = "Unknown";
